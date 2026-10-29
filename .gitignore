@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment and secrets (NEVER commit real credentials)
+.env
+.env.*
+!.env.example
+server/.env
+server/.env.*
+!server/.env.example
+client/.env
+client/.env.*
+!client/.env.example
+
+# Build outputs
+client/dist/
+dist/
+build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Editor & OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+

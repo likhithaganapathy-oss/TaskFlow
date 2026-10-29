@@ -1,0 +1,28 @@
+{
+  "name": "taskflow-root",
+  "version": "1.0.0",
+  "description": "TaskFlow - Student Task & Assignment Manager (MERN Stack)",
+  "private": true,
+  "scripts": {
+    "start": "node server/server.js",
+    "server": "node --watch server/server.js",
+    "client": "npm --prefix client run dev",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "npm --prefix client run build",
+    "seed": "npm --prefix server run seed",
+    "seed:admin": "npm --prefix server run seed:admin",
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "mern",
+    "student-tasks",
+    "assignment-manager",
+    "productivity"
+  ],
+  "author": "TaskFlow Team",
+  "license": "MIT"
+}
+

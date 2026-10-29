@@ -1,0 +1,39 @@
+{
+  "name": "taskflow-server",
+  "version": "1.0.0",
+  "description": "Backend API for TaskFlow - Student Task & Assignment Manager",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test_backend.js",
+    "test:rbac": "node tests/rbac_tests.js",
+    "test:visibility": "node tests/assignment_visibility_tests.js",
+    "test:fixes": "node tests/verify_fixes.js",
+    "test:all": "node test_backend.js && node tests/rbac_tests.js && node tests/assignment_visibility_tests.js && node tests/verify_fixes.js",
+    "seed": "node seed.js",
+    "seed:admin": "node scripts/seedAdmin.js",
+    "migrate:assignments": "node scripts/migrateAssignments.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.8.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  },
+  "keywords": [
+    "express",
+    "mongodb",
+    "mongoose",
+    "jwt",
+    "auth"
+  ],
+  "author": "TaskFlow",
+  "license": "MIT"
+}
+
