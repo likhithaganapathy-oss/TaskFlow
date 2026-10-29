@@ -3,7 +3,8 @@
  * Reusable HTTP helper for communicating with the Express backend
  */
 
-const API_BASE = '/api';
+const RAW_BASE = import.meta.env.VITE_API_URL || '';
+const API_BASE = RAW_BASE ? `${RAW_BASE.replace(/\/+$/, '')}/api` : '/api';
 
 export const request = async (endpoint, options = {}) => {
   const token = localStorage.getItem('taskflow_token');
