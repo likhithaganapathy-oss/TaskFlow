@@ -29,26 +29,10 @@ connectDB();
 
 const app = express();
 
-// ── CORS: restrict to known frontend origin(s) ─────────────────────────
-const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
-  .split(',')
-  .map((o) => o.trim().replace(/\/+$/, ''));
-
+// ── CORS: allow all origins with credentials ───────────────────────────
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow server-to-server or curl/mobile requests without origin header
-      if (!origin) return callback(null, true);
-      const cleanOrigin = origin.replace(/\/+$/, '');
-      if (
-        allowedOrigins.includes('*') ||
-        allowedOrigins.includes(cleanOrigin) ||
-        process.env.NODE_ENV !== 'production'
-      ) {
-        return callback(null, true);
-      }
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
-    },
+    origin: true,
     credentials: true,
   })
 );
