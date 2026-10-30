@@ -2,20 +2,29 @@ const mongoose = require('mongoose');
 
 /**
  * Connect to MongoDB Atlas or local MongoDB instance.
- * Admin provisioning is handled exclusively by scripts/seedAdmin.js — never here.
+ * Supports connection caching across warm serverless function invocations (e.g. on Vercel).
  */
 const connectDB = async () => {
+  if (mongoose.connection.readyState >= 1) {
+    return mongoose.connection;
+  }
+
+  if (!process.env.MONGODB_URI) {
+    console.error('[TaskFlow DB] MONGODB_URI is not set in environment variables.');
+    return;
+  }
+
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
+    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 8000,
+    });
     console.log(`[TaskFlow DB] MongoDB Connected: ${conn.connection.host}`);
+    return conn;
   } catch (error) {
     console.error(`[TaskFlow DB] Connection Error: ${error.message}`);
-    console.error(`[TaskFlow DB] Hint: Check your MONGODB_URI in server/.env.`);
-    console.error(`[TaskFlow DB] If using MongoDB Atlas, ensure:`);
-    console.error(`  1. Your IP address is added to Atlas Network Access (or 0.0.0.0/0 for testing)`);
-    console.error(`  2. The database user password is correct and URL-encoded if it contains special characters`);
-    console.error(`  3. Or run a local MongoDB instance on mongodb://127.0.0.1:27017/taskflow`);
-    process.exit(1);
+    if (process.env.NODE_ENV !== 'production') {
+      process.exit(1);
+    }
   }
 };
 

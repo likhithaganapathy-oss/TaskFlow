@@ -84,15 +84,30 @@ app.get('/', (req, res) => {
   res.send('TaskFlow Backend API is running. Access endpoints via /api/');
 });
 
+// Ensure database is connected on incoming requests (handles serverless cold starts)
+app.use(async (req, res, next) => {
+  if (!isConnected() && process.env.MONGODB_URI) {
+    try {
+      await connectDB();
+    } catch (err) {
+      console.error('[DB Middleware Error]:', err.message);
+    }
+  }
+  next();
+});
+
 // Centralized error handling
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`===============================================`);
+    console.log(`🚀 TaskFlow Backend Server running on port ${PORT}`);
+    console.log(`📡 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`===============================================`);
+  });
+}
 
-app.listen(PORT, () => {
-  console.log(`===============================================`);
-  console.log(`🚀 TaskFlow Backend Server running on port ${PORT}`);
-  console.log(`📡 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`===============================================`);
-});
+module.exports = app;
