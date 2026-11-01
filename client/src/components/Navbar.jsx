@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Plus, LogOut, CheckSquare, Sparkles } from 'lucide-react';
+import { Menu, LogOut, CheckSquare, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Navbar = ({ onOpenMobileSidebar, onOpenNewTaskModal }) => {
@@ -28,20 +28,8 @@ const Navbar = ({ onOpenMobileSidebar, onOpenNewTaskModal }) => {
         </div>
       </div>
 
-      {/* Right: Quick actions & User Profile */}
+      {/* Right: User Profile & Actions */}
       <div className="flex items-center gap-3">
-        {onOpenNewTaskModal && (
-          <button
-            type="button"
-            onClick={onOpenNewTaskModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 active:scale-[0.98] transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">New Assignment</span>
-            <span className="sm:hidden">New</span>
-          </button>
-        )}
-
         {/* User Pill */}
         <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
           <div className="flex items-center gap-2.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200">
