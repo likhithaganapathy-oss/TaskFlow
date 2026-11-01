@@ -1,30 +1,43 @@
 const mongoose = require('mongoose');
 
+let cached = global.mongoose;
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
 /**
  * Connect to MongoDB Atlas or local MongoDB instance.
- * Supports connection caching across warm serverless function invocations (e.g. on Vercel).
+ * Supports connection caching across serverless function invocations (Vercel).
  */
 const connectDB = async () => {
-  if (mongoose.connection.readyState >= 1) {
+  if (mongoose.connection.readyState === 1) {
     return mongoose.connection;
   }
 
   if (!process.env.MONGODB_URI) {
-    console.error('[TaskFlow DB] MONGODB_URI is not set in environment variables.');
-    return;
+    const msg = '[TaskFlow DB] MONGODB_URI is not set in environment variables.';
+    console.error(msg);
+    throw new Error(msg);
+  }
+
+  if (!cached.promise) {
+    cached.promise = mongoose
+      .connect(process.env.MONGODB_URI, {
+        serverSelectionTimeoutMS: 10000,
+      })
+      .then((conn) => {
+        console.log(`[TaskFlow DB] MongoDB Connected: ${conn.connection.host}`);
+        return conn;
+      });
   }
 
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 8000,
-    });
-    console.log(`[TaskFlow DB] MongoDB Connected: ${conn.connection.host}`);
-    return conn;
+    cached.conn = await cached.promise;
+    return cached.conn;
   } catch (error) {
+    cached.promise = null;
     console.error(`[TaskFlow DB] Connection Error: ${error.message}`);
-    if (process.env.NODE_ENV !== 'production') {
-      process.exit(1);
-    }
+    throw error;
   }
 };
 
