@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Assignment = require('../models/Assignment');
 const AssignmentProgress = require('../models/AssignmentProgress');
+const { notifyUser } = require('./notificationController');
 
 /**
  * Escape special regex characters so user input is treated as a literal string.
@@ -30,8 +31,13 @@ const getAdminStats = async (req, res, next) => {
     });
 
     const progressMap = new Map();
+    let totalSubmissions = 0;
+    let totalGraded = 0;
+
     for (const pr of progressRecords) {
       progressMap.set(`${pr.student.toString()}_${pr.assignment.toString()}`, pr.status);
+      if (pr.submission && pr.submission.submitted) totalSubmissions++;
+      if (pr.grade && pr.grade.marks !== null) totalGraded++;
     }
 
     let completedTasks = 0;
@@ -58,6 +64,12 @@ const getAdminStats = async (req, res, next) => {
           assignment.scope === 'personal' &&
           assignment.createdBy &&
           assignment.createdBy.toString() === studentIdStr
+        ) {
+          isApplicable = true;
+        } else if (
+          assignment.isGroup &&
+          assignment.groupMembers &&
+          assignment.groupMembers.some((id) => id.toString() === studentIdStr)
         ) {
           isApplicable = true;
         }
@@ -90,20 +102,21 @@ const getAdminStats = async (req, res, next) => {
     // Recent student signups
     const recentStudents = await User.find({ role: 'student' })
       .sort({ createdAt: -1 })
-      .limit(5)
-      .select('name email createdAt');
+      .limit(6)
+      .select('name email avatar createdAt');
 
     return res.status(200).json({
       success: true,
       stats: {
         totalStudents,
         totalTasks,
-        totalWorkloads,
         pendingTasks,
         inProgressTasks,
         completedTasks,
         overdueTasks,
-        completionRate: Math.min(100, completionRate),
+        completionRate,
+        totalSubmissions,
+        totalGraded,
       },
       recentStudents,
     });
@@ -113,112 +126,107 @@ const getAdminStats = async (req, res, next) => {
 };
 
 /**
- * @desc    Get all registered student accounts with their individual assignment metrics
+ * @desc    Get all students with individual task metrics for Admin
  * @route   GET /api/admin/users
  * @access  Private/Admin
  */
 const getAllStudents = async (req, res, next) => {
   try {
-    const { search, page = 1, limit = 20 } = req.query;
+    const { search, page = 1, limit = 50 } = req.query;
     const query = { role: 'student' };
 
     if (search && search.trim() !== '') {
-      const trimmed = search.trim().slice(0, 200);
-      const regex = new RegExp(escapeRegex(trimmed), 'i');
-      query.$or = [{ name: regex }, { email: regex }];
+      const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
+      query.$or = [{ name: searchRegex }, { email: searchRegex }];
     }
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
     const skip = (pageNum - 1) * limitNum;
 
     const totalCount = await User.countDocuments(query);
-
     const students = await User.find(query)
+      .select('name email avatar role createdAt')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limitNum)
-      .select('name email role createdAt');
-
-    // Fetch institution-wide assignments
-    const allInstitutionAssignments = await Assignment.find({ scope: 'all' });
-    const institutionAssignmentIds = allInstitutionAssignments.map((a) => a._id);
+      .limit(limitNum);
 
     const now = new Date();
+    const allAssignments = await Assignment.find({});
+    const studentIds = students.map((s) => s._id);
 
-    // Compute metrics for each student
-    const studentsWithMetrics = await Promise.all(
-      students.map(async (student) => {
-        // Individual and personal assignments for this student
-        const personalOrAssigned = await Assignment.find({
-          $or: [
-            { scope: 'individual', assignedTo: student._id },
-            { scope: 'personal', createdBy: student._id },
-          ],
-        });
+    const allProgressRecords = await AssignmentProgress.find({
+      student: { $in: studentIds },
+    });
 
-        const totalApplicable = allInstitutionAssignments.length + personalOrAssigned.length;
-        const allApplicableIds = [
-          ...institutionAssignmentIds,
-          ...personalOrAssigned.map((a) => a._id),
-        ];
+    const progressMap = new Map();
+    for (const pr of allProgressRecords) {
+      progressMap.set(`${pr.student.toString()}_${pr.assignment.toString()}`, pr);
+    }
 
-        // Fetch progress records for this student
-        const studentProgress = await AssignmentProgress.find({
-          student: student._id,
-          assignment: { $in: allApplicableIds },
-        });
+    const studentsWithMetrics = students.map((student) => {
+      const studentIdStr = student._id.toString();
+      let completed = 0;
+      let pending = 0;
+      let inProgress = 0;
+      let overdue = 0;
+      let totalApplicable = 0;
+      let submissionsSubmitted = 0;
 
-        const pMap = {};
-        studentProgress.forEach((p) => {
-          pMap[p.assignment.toString()] = p.status;
-        });
+      allAssignments.forEach((assignment) => {
+        let isApplicable = false;
+        if (assignment.scope === 'all') isApplicable = true;
+        else if (
+          assignment.scope === 'individual' &&
+          assignment.assignedTo &&
+          assignment.assignedTo.toString() === studentIdStr
+        )
+          isApplicable = true;
+        else if (
+          assignment.scope === 'personal' &&
+          assignment.createdBy &&
+          assignment.createdBy.toString() === studentIdStr
+        )
+          isApplicable = true;
 
-        let completed = 0;
-        let pending = 0;
-        let overdue = 0;
+        if (isApplicable) {
+          totalApplicable++;
+          const pr = progressMap.get(`${studentIdStr}_${assignment._id.toString()}`);
+          const status = pr ? pr.status : 'Pending';
+          const isOverdue =
+            status !== 'Completed' && new Date(assignment.dueDate).getTime() < now.getTime();
 
-        // Check institution assignments
-        allInstitutionAssignments.forEach((a) => {
-          const s = pMap[a._id.toString()] || 'Pending';
-          if (s === 'Completed') completed++;
-          else if (s === 'In Progress' || s === 'Pending') pending++;
+          if (pr && pr.submission && pr.submission.submitted) submissionsSubmitted++;
 
-          if (s !== 'Completed' && new Date(a.dueDate).getTime() < now.getTime()) {
-            overdue++;
-          }
-        });
-
-        // Check personal/assigned assignments
-        personalOrAssigned.forEach((a) => {
-          const s = pMap[a._id.toString()] || 'Pending';
-          if (s === 'Completed') completed++;
+          if (status === 'Completed') completed++;
+          else if (status === 'In Progress') inProgress++;
           else pending++;
 
-          if (s !== 'Completed' && new Date(a.dueDate).getTime() < now.getTime()) {
-            overdue++;
-          }
-        });
+          if (isOverdue) overdue++;
+        }
+      });
 
-        const completionRate =
-          totalApplicable > 0 ? Math.round((completed / totalApplicable) * 100) : 0;
+      const completionRate =
+        totalApplicable > 0 ? Math.round((completed / totalApplicable) * 100) : 0;
 
-        return {
-          _id: student._id,
-          name: student.name,
-          email: student.email,
-          role: student.role,
-          createdAt: student.createdAt,
-          taskMetrics: {
-            total: totalApplicable,
-            completed,
-            pending,
-            overdue,
-            completionRate,
-          },
-        };
-      })
-    );
+      return {
+        _id: student._id,
+        name: student.name,
+        email: student.email,
+        avatar: student.avatar || 'avatar-1',
+        role: student.role,
+        createdAt: student.createdAt,
+        taskMetrics: {
+          total: totalApplicable,
+          completed,
+          pending,
+          inProgress,
+          overdue,
+          submissionsSubmitted,
+          completionRate,
+        },
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -284,13 +292,13 @@ const deleteStudent = async (req, res, next) => {
  */
 const getAllTasks = async (req, res, next) => {
   try {
-    const { studentId, scope, search, subject, status, priority, sort, page = 1, limit = 50 } = req.query;
+    const { studentId, scope, search, subject, status, priority, category, sort, page = 1, limit = 50 } = req.query;
     const andConditions = [];
 
     // Filter by student
     if (studentId && studentId !== 'All') {
       andConditions.push({
-        $or: [{ assignedTo: studentId }, { createdBy: studentId }],
+        $or: [{ assignedTo: studentId }, { createdBy: studentId }, { groupMembers: studentId }],
       });
     }
 
@@ -299,54 +307,34 @@ const getAllTasks = async (req, res, next) => {
       andConditions.push({ scope });
     }
 
-    // Filter by search keyword (title or subject)
+    // Filter by category
+    if (category && category !== 'All') {
+      andConditions.push({ category });
+    }
+
+    // Search filter
     if (search && search.trim() !== '') {
-      const trimmed = search.trim().slice(0, 200);
-      const regex = new RegExp(escapeRegex(trimmed), 'i');
+      const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
       andConditions.push({
-        $or: [{ title: regex }, { subject: regex }],
+        $or: [{ title: searchRegex }, { subject: searchRegex }],
       });
     }
 
-    // Filter by subject
+    // Subject filter
     if (subject && subject !== 'All') {
-      andConditions.push({ subject: subject.trim() });
+      andConditions.push({ subject });
     }
 
-    // Filter by priority
+    // Priority filter
     if (priority && priority !== 'All' && ['High', 'Medium', 'Low'].includes(priority)) {
       andConditions.push({ priority });
     }
 
-    // Filter by status using AssignmentProgress correctly
-    if (status && status !== 'All' && ['Pending', 'In Progress', 'Completed'].includes(status)) {
-      if (studentId && studentId !== 'All') {
-        if (status === 'Pending') {
-          // If status is Pending, find assignments where progress is explicitly Pending
-          // OR institution-wide assignments where this student has no In Progress / Completed progress record
-          const nonPendingProgress = await AssignmentProgress.find({
-            student: studentId,
-            status: { $in: ['In Progress', 'Completed'] },
-          }).distinct('assignment');
-
-          const explicitPending = await AssignmentProgress.find({
-            student: studentId,
-            status: 'Pending',
-          }).distinct('assignment');
-
-          andConditions.push({
-            $or: [
-              { _id: { $in: explicitPending } },
-              { scope: 'all', _id: { $nin: nonPendingProgress } },
-            ],
-          });
-        } else {
-          const matchingProgress = await AssignmentProgress.find({
-            student: studentId,
-            status,
-          }).distinct('assignment');
-          andConditions.push({ _id: { $in: matchingProgress } });
-        }
+    // Status filter
+    if (status && status !== 'All') {
+      const now = new Date();
+      if (status === 'Overdue') {
+        andConditions.push({ dueDate: { $lt: now } });
       } else {
         const matchingProgress = await AssignmentProgress.find({
           status,
@@ -369,27 +357,51 @@ const getAllTasks = async (req, res, next) => {
     const totalCount = await Assignment.countDocuments(query);
 
     const assignments = await Assignment.find(query)
-      .populate('createdBy', 'name email role')
-      .populate('assignedTo', 'name email role')
+      .populate('createdBy', 'name email role avatar')
+      .populate('assignedTo', 'name email role avatar')
+      .populate('groupMembers', 'name email role avatar')
       .sort(sortOptions)
       .skip(skip)
       .limit(limitNum);
 
-    // Map each assignment and attach user / assignedStudent info
+    const assignmentIds = assignments.map((a) => a._id);
+    const progresses = await AssignmentProgress.find({ assignment: { $in: assignmentIds } })
+      .populate('student', 'name email avatar')
+      .populate('grade.gradedBy', 'name email');
+
+    const progressByAssignment = {};
+    progresses.forEach((p) => {
+      const aid = p.assignment.toString();
+      if (!progressByAssignment[aid]) progressByAssignment[aid] = [];
+      progressByAssignment[aid].push(p);
+    });
+
+    // Map each assignment and attach user / submission info
     const now = new Date();
     const tasks = assignments.map((a) => {
       const isOverdue = new Date(a.dueDate).getTime() < now.getTime();
+      const progs = progressByAssignment[a._id.toString()] || [];
+      const submissions = progs.filter((p) => p.submission && p.submission.submitted);
+      const graded = progs.filter((p) => p.grade && p.grade.marks !== null);
+
       return {
         _id: a._id,
         title: a.title,
         subject: a.subject,
+        category: a.category || 'Homework',
         description: a.description,
         dueDate: a.dueDate,
         priority: a.priority,
         scope: a.scope,
+        maxMarks: a.maxMarks || 100,
+        isGroup: a.isGroup || false,
+        groupMembers: a.groupMembers || [],
         createdBy: a.createdBy,
         assignedTo: a.assignedTo,
-        user: a.assignedTo || a.createdBy, // Backward compatibility for UI
+        user: a.assignedTo || a.createdBy,
+        submissionsCount: submissions.length,
+        gradedCount: graded.length,
+        progressCount: progs.length,
         isOverdue,
         createdAt: a.createdAt,
         updatedAt: a.updatedAt,
@@ -410,20 +422,31 @@ const getAllTasks = async (req, res, next) => {
 };
 
 /**
- * @desc    Admin creates an assignment (Institution-wide or for an Individual Student)
+ * @desc    Admin creates an assignment (Institution-wide, Individual Student, or Group Assignment)
  * @route   POST /api/admin/tasks
  * @access  Private/Admin
  */
 const createTaskForStudent = async (req, res, next) => {
   try {
-    const { scope = 'individual', studentId, title, subject, description, dueDate, priority, status } =
-      req.body;
+    const {
+      scope = 'individual',
+      studentId,
+      title,
+      subject,
+      category = 'Homework',
+      description,
+      dueDate,
+      priority,
+      status,
+      maxMarks = 100,
+      isGroup = false,
+      groupMembers = [],
+    } = req.body;
 
     const targetScope = scope === 'all' ? 'all' : 'individual';
-
     let assignedStudent = null;
 
-    if (targetScope === 'individual') {
+    if (targetScope === 'individual' && !isGroup) {
       if (!studentId) {
         return res.status(400).json({
           success: false,
@@ -441,67 +464,104 @@ const createTaskForStudent = async (req, res, next) => {
     }
 
     if (!title || !title.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Assignment title is required.',
-      });
+      return res.status(400).json({ success: false, message: 'Assignment title is required.' });
     }
-
     if (!subject || !subject.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Subject is required.',
-      });
+      return res.status(400).json({ success: false, message: 'Subject is required.' });
     }
-
     if (!dueDate) {
-      return res.status(400).json({
-        success: false,
-        message: 'Due date is required.',
-      });
+      return res.status(400).json({ success: false, message: 'Due date is required.' });
     }
 
     const parsedDueDate = new Date(dueDate);
     if (isNaN(parsedDueDate.getTime())) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide a valid due date.',
-      });
+      return res.status(400).json({ success: false, message: 'Please provide a valid due date.' });
     }
 
     const assignment = await Assignment.create({
       title: title.trim(),
       subject: subject.trim(),
+      category: ['Homework', 'Lab Report', 'Project', 'Essay', 'Presentation', 'Exam Prep', 'Other'].includes(category)
+        ? category
+        : 'Homework',
       description: description ? description.trim() : '',
       dueDate: parsedDueDate,
       priority: priority && ['High', 'Medium', 'Low'].includes(priority) ? priority : 'Medium',
       scope: targetScope,
+      maxMarks: Number(maxMarks) || 100,
+      isGroup: Boolean(isGroup),
+      groupMembers: Array.isArray(groupMembers) ? groupMembers : [],
       createdBy: req.user._id,
-      assignedTo: targetScope === 'individual' ? assignedStudent._id : null,
+      assignedTo: targetScope === 'individual' && assignedStudent ? assignedStudent._id : null,
     });
 
-    // If assigned to an individual student, create initial progress record for that student
-    if (targetScope === 'individual' && assignedStudent) {
-      const initialStatus = ['Pending', 'In Progress', 'Completed'].includes(status)
-        ? status
-        : 'Pending';
+    const initialStatus = ['Pending', 'In Progress', 'Completed'].includes(status) ? status : 'Pending';
 
+    // If assigned to an individual student, create progress record and notify
+    if (targetScope === 'individual' && assignedStudent) {
       await AssignmentProgress.create({
         assignment: assignment._id,
         student: assignedStudent._id,
         status: initialStatus,
         completedAt: initialStatus === 'Completed' ? new Date() : null,
       });
+
+      await notifyUser({
+        recipient: assignedStudent._id,
+        sender: req.user._id,
+        title: 'New Assignment Assigned! 📚',
+        message: `Faculty assigned you: "${assignment.title}". Due on ${parsedDueDate.toLocaleDateString()}.`,
+        type: 'assignment',
+        link: '/tasks',
+      });
+    }
+
+    // If assigned to group members
+    if (isGroup && Array.isArray(groupMembers) && groupMembers.length > 0) {
+      for (const memberId of groupMembers) {
+        await AssignmentProgress.findOneAndUpdate(
+          { assignment: assignment._id, student: memberId },
+          { status: initialStatus },
+          { upsert: true, setDefaultsOnInsert: true }
+        );
+
+        await notifyUser({
+          recipient: memberId,
+          sender: req.user._id,
+          title: 'New Group Assignment! 👥',
+          message: `You were added to a team for "${assignment.title}". Due on ${parsedDueDate.toLocaleDateString()}.`,
+          type: 'assignment',
+          link: '/tasks',
+        });
+      }
+    }
+
+    // If scope is 'all', notify all students
+    if (targetScope === 'all') {
+      const allStudents = await User.find({ role: 'student' }).select('_id');
+      for (const s of allStudents) {
+        await notifyUser({
+          recipient: s._id,
+          sender: req.user._id,
+          title: 'Campus Coursework Published 📢',
+          message: `New coursework "${assignment.title}" in ${assignment.subject} has been assigned to all students.`,
+          type: 'assignment',
+          link: '/tasks',
+        });
+      }
     }
 
     const populated = await Assignment.findById(assignment._id)
-      .populate('createdBy', 'name email role')
-      .populate('assignedTo', 'name email role');
+      .populate('createdBy', 'name email role avatar')
+      .populate('assignedTo', 'name email role avatar')
+      .populate('groupMembers', 'name email role avatar');
 
     const message =
       targetScope === 'all'
         ? 'Institution-wide assignment published to all registered students!'
-        : `Assignment successfully assigned to ${assignedStudent.name}!`;
+        : isGroup
+        ? `Group assignment created for ${groupMembers.length} team members!`
+        : `Assignment successfully assigned to ${assignedStudent?.name}!`;
 
     return res.status(201).json({
       success: true,
@@ -526,120 +586,49 @@ const updateTaskByAdmin = async (req, res, next) => {
     const assignment = await Assignment.findById(req.params.id);
 
     if (!assignment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Assignment not found.',
-      });
+      return res.status(404).json({ success: false, message: 'Assignment not found.' });
     }
 
-    const { title, subject, description, dueDate, priority, scope, studentId } = req.body;
+    const { title, subject, category, description, dueDate, priority, scope, studentId, maxMarks, isGroup, groupMembers } = req.body;
 
-    // Validate scope if provided
     if (scope !== undefined && !['all', 'individual'].includes(scope)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid assignment scope. Must be "all" or "individual".',
-      });
+      return res.status(400).json({ success: false, message: 'Invalid assignment scope. Must be "all" or "individual".' });
     }
 
     const targetScope = scope !== undefined ? scope : assignment.scope;
 
-    // Handle individual assignment scope
     if (targetScope === 'individual') {
       const targetStudentId = studentId || assignment.assignedTo;
-
-      if (!targetStudentId) {
-        return res.status(400).json({
-          success: false,
-          message: 'A valid student account with the student role is required for individual assignments.',
-        });
+      if (targetStudentId) {
+        assignment.scope = 'individual';
+        assignment.assignedTo = targetStudentId;
       }
-
-      const student = await User.findById(targetStudentId);
-      if (!student || student.role !== 'student') {
-        return res.status(400).json({
-          success: false,
-          message: 'A valid student account with the student role is required for individual assignments.',
-        });
-      }
-
-      const previousStudentId = assignment.assignedTo ? assignment.assignedTo.toString() : null;
-      const newStudentId = student._id.toString();
-
-      // If reassigning to a different student, do NOT transfer previous student's progress
-      if (previousStudentId && previousStudentId !== newStudentId) {
-        // Delete previous student's progress for this assignment
-        await AssignmentProgress.deleteMany({
-          assignment: assignment._id,
-          student: previousStudentId,
-        });
-
-        // Initialize fresh Pending status for the newly assigned student
-        await AssignmentProgress.findOneAndUpdate(
-          { assignment: assignment._id, student: student._id },
-          { status: 'Pending', completedAt: null },
-          { upsert: true, setDefaultsOnInsert: true }
-        );
-      } else if (!previousStudentId || assignment.scope !== 'individual') {
-        // Changing from institution-wide to individual: clean up any other student records
-        await AssignmentProgress.deleteMany({
-          assignment: assignment._id,
-          student: { $ne: student._id },
-        });
-
-        // Ensure fresh Pending progress for this designated student
-        await AssignmentProgress.findOneAndUpdate(
-          { assignment: assignment._id, student: student._id },
-          { status: 'Pending', completedAt: null },
-          { upsert: true, setDefaultsOnInsert: true }
-        );
-      }
-
-      assignment.scope = 'individual';
-      assignment.assignedTo = student._id;
     } else if (targetScope === 'all') {
       assignment.scope = 'all';
       assignment.assignedTo = null;
     }
 
-    if (title !== undefined) {
-      if (!title.trim()) {
-        return res.status(400).json({ success: false, message: 'Assignment title cannot be empty.' });
-      }
-      assignment.title = title.trim();
-    }
-
-    if (subject !== undefined) {
-      if (!subject.trim()) {
-        return res.status(400).json({ success: false, message: 'Subject cannot be empty.' });
-      }
-      assignment.subject = subject.trim();
-    }
-
-    if (description !== undefined) {
-      assignment.description = description.trim();
-    }
-
-    if (dueDate !== undefined) {
+    if (title && title.trim()) assignment.title = title.trim();
+    if (subject && subject.trim()) assignment.subject = subject.trim();
+    if (category) assignment.category = category;
+    if (description !== undefined) assignment.description = description.trim();
+    if (dueDate) {
       const parsed = new Date(dueDate);
-      if (isNaN(parsed.getTime())) {
-        return res.status(400).json({ success: false, message: 'Please provide a valid due date.' });
-      }
-      assignment.dueDate = parsed;
+      if (!isNaN(parsed.getTime())) assignment.dueDate = parsed;
     }
-
-    if (priority !== undefined) {
-      if (!['High', 'Medium', 'Low'].includes(priority)) {
-        return res.status(400).json({ success: false, message: 'Priority must be High, Medium, or Low.' });
-      }
+    if (priority && ['High', 'Medium', 'Low'].includes(priority)) {
       assignment.priority = priority;
     }
+    if (maxMarks) assignment.maxMarks = Number(maxMarks) || 100;
+    if (isGroup !== undefined) assignment.isGroup = Boolean(isGroup);
+    if (Array.isArray(groupMembers)) assignment.groupMembers = groupMembers;
 
     await assignment.save();
 
     const updated = await Assignment.findById(assignment._id)
-      .populate('createdBy', 'name email role')
-      .populate('assignedTo', 'name email role');
+      .populate('createdBy', 'name email role avatar')
+      .populate('assignedTo', 'name email role avatar')
+      .populate('groupMembers', 'name email role avatar');
 
     return res.status(200).json({
       success: true,
@@ -648,6 +637,104 @@ const updateTaskByAdmin = async (req, res, next) => {
         ...updated.toJSON(),
         user: updated.assignedTo || updated.createdBy,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Faculty / Admin evaluates and grades a student submission
+ * @route   POST /api/admin/tasks/:id/grade
+ * @access  Private/Admin
+ */
+const gradeSubmission = async (req, res, next) => {
+  try {
+    const { studentId, marks, maxMarks, feedback } = req.body;
+    const assignment = await Assignment.findById(req.params.id);
+
+    if (!assignment) {
+      return res.status(404).json({ success: false, message: 'Assignment not found' });
+    }
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'Target student ID is required' });
+    }
+
+    const numericMarks = Number(marks);
+    if (isNaN(numericMarks) || numericMarks < 0) {
+      return res.status(400).json({ success: false, message: 'Please provide valid non-negative marks' });
+    }
+
+    const progress = await AssignmentProgress.findOneAndUpdate(
+      { assignment: assignment._id, student: studentId },
+      {
+        grade: {
+          marks: numericMarks,
+          maxMarks: Number(maxMarks) || assignment.maxMarks || 100,
+          feedback: feedback ? feedback.trim() : '',
+          gradedBy: req.user._id,
+          gradedAt: new Date(),
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    // Notify the student
+    await notifyUser({
+      recipient: studentId,
+      sender: req.user._id,
+      title: 'Coursework Graded! 🎓',
+      message: `Your work for "${assignment.title}" received ${numericMarks}/${progress.grade.maxMarks} marks. ${feedback ? 'Feedback: ' + feedback : ''}`,
+      type: 'feedback',
+      link: '/tasks',
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Evaluation and feedback recorded successfully!',
+      grade: progress.grade,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get all student submissions and progress for an assignment
+ * @route   GET /api/admin/tasks/:id/submissions
+ * @access  Private/Admin
+ */
+const getSubmissions = async (req, res, next) => {
+  try {
+    const assignment = await Assignment.findById(req.params.id);
+    if (!assignment) {
+      return res.status(404).json({ success: false, message: 'Assignment not found' });
+    }
+
+    const progresses = await AssignmentProgress.find({ assignment: assignment._id })
+      .populate('student', 'name email avatar role')
+      .populate('grade.gradedBy', 'name email');
+
+    return res.status(200).json({
+      success: true,
+      assignment: {
+        _id: assignment._id,
+        title: assignment.title,
+        subject: assignment.subject,
+        dueDate: assignment.dueDate,
+        maxMarks: assignment.maxMarks,
+        isGroup: assignment.isGroup,
+      },
+      submissions: progresses.map((p) => ({
+        _id: p._id,
+        student: p.student,
+        status: p.status,
+        completedAt: p.completedAt,
+        submission: p.submission,
+        grade: p.grade,
+        timeSpentMinutes: p.timeSpentMinutes,
+        pomodoroSessions: p.pomodoroSessions,
+      })),
     });
   } catch (error) {
     next(error);
@@ -664,13 +751,9 @@ const deleteTaskByAdmin = async (req, res, next) => {
     const assignment = await Assignment.findById(req.params.id);
 
     if (!assignment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Assignment not found.',
-      });
+      return res.status(404).json({ success: false, message: 'Assignment not found.' });
     }
 
-    // Cascade delete associated progress records
     await AssignmentProgress.deleteMany({ assignment: assignment._id });
     await Assignment.findByIdAndDelete(assignment._id);
 
@@ -690,5 +773,7 @@ module.exports = {
   getAllTasks,
   createTaskForStudent,
   updateTaskByAdmin,
+  gradeSubmission,
+  getSubmissions,
   deleteTaskByAdmin,
 };

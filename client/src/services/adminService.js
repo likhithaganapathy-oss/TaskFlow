@@ -30,6 +30,7 @@ export const adminService = {
     const query = new URLSearchParams();
     if (params.studentId && params.studentId !== 'All') query.append('studentId', params.studentId);
     if (params.scope && params.scope !== 'All') query.append('scope', params.scope);
+    if (params.category && params.category !== 'All') query.append('category', params.category);
     if (params.search) query.append('search', params.search);
     if (params.subject && params.subject !== 'All') query.append('subject', params.subject);
     if (params.status && params.status !== 'All') query.append('status', params.status);
@@ -42,7 +43,7 @@ export const adminService = {
   },
 
   /**
-   * Create an assignment assigned to a specific student
+   * Create an assignment assigned to all, specific student, or group
    */
   async createTaskForStudent(taskData) {
     return await api.post('/admin/tasks', taskData);
@@ -56,10 +57,28 @@ export const adminService = {
   },
 
   /**
+   * Fetch student submissions for an assignment
+   */
+  async getSubmissions(taskId) {
+    return await api.get(`/admin/tasks/${taskId}/submissions`);
+  },
+
+  /**
+   * Grade a student submission with marks & feedback
+   */
+  async gradeSubmission(taskId, { studentId, marks, maxMarks, feedback }) {
+    return await api.post(`/admin/tasks/${taskId}/grade`, {
+      studentId,
+      marks,
+      maxMarks,
+      feedback,
+    });
+  },
+
+  /**
    * Delete any assignment
    */
   async deleteTask(id) {
     return await api.delete(`/admin/tasks/${id}`);
   },
 };
-

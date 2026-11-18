@@ -63,6 +63,7 @@ const registerUser = async (req, res, next) => {
       email: normalizedEmail,
       password,
       role: 'student',
+      avatar: 'avatar-1',
     });
 
     // Generate token
@@ -77,6 +78,8 @@ const registerUser = async (req, res, next) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        avatar: user.avatar,
+        preferences: user.preferences,
         createdAt: user.createdAt,
       },
     });
@@ -133,6 +136,8 @@ const loginUser = async (req, res, next) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        avatar: user.avatar || 'avatar-1',
+        preferences: user.preferences || { theme: 'light' },
         createdAt: user.createdAt,
       },
     });
@@ -157,8 +162,55 @@ const getCurrentUser = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Update user profile & preferences (avatar, theme, study goals)
+ * @route   PATCH /api/auth/profile
+ * @access  Private
+ */
+const updateProfile = async (req, res, next) => {
+  try {
+    const { name, avatar, preferences } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User account not found',
+      });
+    }
+
+    if (name && name.trim()) user.name = name.trim();
+    if (avatar) user.avatar = avatar;
+    if (preferences) {
+      user.preferences = {
+        ...user.preferences,
+        ...preferences,
+      };
+    }
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully!',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+        preferences: user.preferences,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getCurrentUser,
+  updateProfile,
 };

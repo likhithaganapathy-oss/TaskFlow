@@ -5,6 +5,7 @@ import TaskCard from '../components/TaskCard';
 import TaskFilters from '../components/TaskFilters';
 import TaskForm from '../components/TaskForm';
 import ConfirmDialog from '../components/ConfirmDialog';
+import SubmissionModal from '../components/SubmissionModal';
 import { taskService } from '../services/taskService';
 import { useToast } from '../context/ToastContext';
 
@@ -20,19 +21,20 @@ const Tasks = () => {
   const [subject, setSubject] = useState('All');
   const [status, setStatus] = useState('All');
   const [priority, setPriority] = useState('All');
+  const [category, setCategory] = useState('All');
   const [sort, setSort] = useState('dueDateAsc');
 
-  // Edit / Delete / Create Modal States
+  // Edit / Delete / Create / Submit Modal States
   const [editingTask, setEditingTask] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [submittingTask, setSubmittingTask] = useState(null);
 
   const fetchTasks = useCallback(async () => {
     try {
       setLoading(true);
-      // Fetch user's tasks with backend ownership enforcement
       const res = await taskService.getTasks();
       if (res.success) {
         setTasks(res.tasks || []);
@@ -81,6 +83,11 @@ const Tasks = () => {
           return false;
         }
 
+        // Category filter (Feature 9)
+        if (category !== 'All' && (task.category || 'Homework') !== category) {
+          return false;
+        }
+
         // Status filter
         if (status !== 'All') {
           if (status === 'Overdue') {
@@ -114,11 +121,12 @@ const Tasks = () => {
         }
         return 0;
       });
-  }, [tasks, search, subject, status, priority, sort]);
+  }, [tasks, search, subject, category, status, priority, sort]);
 
   const handleResetFilters = () => {
     setSearch('');
     setSubject('All');
+    setCategory('All');
     setStatus('All');
     setPriority('All');
     setSort('dueDateAsc');
@@ -168,15 +176,15 @@ const Tasks = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-10">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
             Assignments & Coursework
           </h1>
-          <p className="text-sm text-slate-500">
-            Search, filter, and track all your academic assignments in one place.
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Search, filter, submit deliverables, and track all your academic assignments.
           </p>
         </div>
 
@@ -185,7 +193,7 @@ const Tasks = () => {
             type="button"
             onClick={fetchTasks}
             title="Reload assignments"
-            className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors shadow-sm"
+            className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors shadow-sm"
             aria-label="Refresh list"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -196,7 +204,7 @@ const Tasks = () => {
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-sm transition-all active:scale-[0.98]"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Assignment</span>
+            <span>Add Personal Task</span>
           </button>
         </div>
       </div>
@@ -207,6 +215,8 @@ const Tasks = () => {
         onSearchChange={setSearch}
         subject={subject}
         onSubjectChange={setSubject}
+        category={category}
+        onCategoryChange={setCategory}
         status={status}
         onStatusChange={setStatus}
         priority={priority}
@@ -225,55 +235,45 @@ const Tasks = () => {
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div
               key={i}
-              className="p-5 bg-white rounded-2xl border border-slate-200 animate-pulse space-y-3"
+              className="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 animate-pulse space-y-3"
             >
               <div className="flex justify-between">
-                <div className="h-5 bg-slate-200 rounded w-20"></div>
-                <div className="h-5 bg-slate-200 rounded w-16"></div>
+                <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-20"></div>
+                <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-16"></div>
               </div>
-              <div className="h-6 bg-slate-200 rounded w-3/4"></div>
-              <div className="h-12 bg-slate-100 rounded"></div>
-              <div className="h-8 bg-slate-200 rounded pt-3"></div>
+              <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-3/4"></div>
+              <div className="h-12 bg-slate-100 dark:bg-slate-700/50 rounded"></div>
+              <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded pt-3"></div>
             </div>
           ))}
         </div>
       ) : tasks.length === 0 ? (
-        /* Empty state: No tasks at all */
-        <div className="flex flex-col items-center justify-center p-12 bg-white rounded-3xl border border-dashed border-slate-300 text-center">
-          <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 mb-4">
+        <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-slate-800 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700 text-center">
+          <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 mb-4">
             <BookOpen className="w-8 h-8" />
           </div>
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
             No assignments recorded yet
           </h2>
-          <p className="mt-1 text-sm text-slate-500 max-w-md">
-            Click "+ Add Assignment" to record your coursework, readings, and projects.
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 max-w-md">
+            Your instructor hasn't assigned any coursework yet, or you can add a personal task.
           </p>
-          <button
-            type="button"
-            onClick={() => outletContext?.onOpenNewTaskModal?.()}
-            className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-sm transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create Assignment</span>
-          </button>
         </div>
       ) : filteredTasks.length === 0 ? (
-        /* Empty state: Filters produced 0 matches */
-        <div className="flex flex-col items-center justify-center p-12 bg-white rounded-3xl border border-dashed border-slate-300 text-center">
-          <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 mb-4">
+        <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-slate-800 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700 text-center">
+          <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-400 mb-4">
             <SearchX className="w-8 h-8" />
           </div>
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
             No matching assignments found
           </h2>
-          <p className="mt-1 text-sm text-slate-500 max-w-md">
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 max-w-md">
             Try adjusting your search keywords, clearing selected filters, or resetting the filter view.
           </p>
           <button
             type="button"
             onClick={handleResetFilters}
-            className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
+            className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-semibold text-xs transition-colors"
           >
             Reset All Filters
           </button>
@@ -290,9 +290,22 @@ const Tasks = () => {
               }}
               onDelete={(t) => setTaskToDelete(t)}
               onStatusChange={handleStatusChange}
+              onSubmitWork={(t) => setSubmittingTask(t)}
             />
           ))}
         </div>
+      )}
+
+      {/* Submission Modal (Feature 3) */}
+      {submittingTask && (
+        <SubmissionModal
+          isOpen={!!submittingTask}
+          onClose={() => setSubmittingTask(null)}
+          task={submittingTask}
+          onSubmitted={() => {
+            fetchTasks();
+          }}
+        />
       )}
 
       {/* Edit Assignment Modal */}
@@ -322,4 +335,3 @@ const Tasks = () => {
 };
 
 export default Tasks;
-

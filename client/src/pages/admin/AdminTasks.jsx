@@ -18,15 +18,20 @@ import {
   RotateCcw,
   Globe,
   UserCheck,
+  Award,
+  Users,
 } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import GradingModal from '../../components/GradingModal';
 import { adminService } from '../../services/adminService';
 import { formatDisplayDate, getDueStatusInfo } from '../../components/TaskCard';
 import { useToast } from '../../context/ToastContext';
 
+const CATEGORIES = ['Homework', 'Lab Report', 'Project', 'Essay', 'Exam Prep'];
+
 const AdminTasks = () => {
   const { showSuccess, showError } = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState([]);
@@ -47,12 +52,18 @@ const AdminTasks = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Faculty Grading Modal state (Feature 5)
+  const [gradingTask, setGradingTask] = useState(null);
+
   // Form State
   const [formData, setFormData] = useState({
-    scope: 'all', // 'all' (Institution-wide) or 'individual' (Individual Student)
+    scope: 'all',
     studentId: '',
     title: '',
     subject: 'Computer Science',
+    category: 'Homework',
+    maxMarks: 100,
+    isGroup: false,
     description: '',
     dueDate: '',
     priority: 'Medium',
@@ -109,6 +120,9 @@ const AdminTasks = () => {
       studentId: students.length > 0 ? students[0]._id : '',
       title: '',
       subject: 'Computer Science',
+      category: 'Homework',
+      maxMarks: 100,
+      isGroup: false,
       description: '',
       dueDate: `${y}-${m}-${d}`,
       priority: 'Medium',
@@ -129,6 +143,9 @@ const AdminTasks = () => {
       studentId: task.assignedTo?._id || task.user?._id || (students.length > 0 ? students[0]._id : ''),
       title: task.title,
       subject: task.subject,
+      category: task.category || 'Homework',
+      maxMarks: task.maxMarks || 100,
+      isGroup: task.isGroup || false,
       description: task.description || '',
       dueDate: `${y}-${m}-${day}`,
       priority: task.priority,
@@ -157,6 +174,9 @@ const AdminTasks = () => {
         studentId: formData.scope === 'individual' ? formData.studentId : undefined,
         title: formData.title.trim(),
         subject: formData.subject.trim(),
+        category: formData.category,
+        maxMarks: Number(formData.maxMarks) || 100,
+        isGroup: Boolean(formData.isGroup),
         description: formData.description.trim(),
         dueDate: resolvedDueDate,
         priority: formData.priority,
@@ -188,7 +208,7 @@ const AdminTasks = () => {
     try {
       setIsDeleting(true);
       await adminService.deleteTask(taskToDelete._id);
-      showSuccess('Assignment deleted successfully.');
+      showSuccess('Assignment removed from campus catalogue.');
       setTaskToDelete(null);
       fetchTasksAndStudents();
     } catch (err) {
@@ -205,24 +225,23 @@ const AdminTasks = () => {
     setSubject('All');
     setPriority('All');
     setSort('dueDateAsc');
-    setSearchParams({});
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
+    <div className="space-y-6 animate-fade-in pb-12">
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 uppercase tracking-wide">
-              Faculty / Admin
+            <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+              Faculty Console
             </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 mt-1">
-            Institutional Assignment Management
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mt-1">
+            Institutional Coursework & Evaluation
           </h1>
-          <p className="text-sm text-slate-500">
-            Publish coursework to all students or assign targeted tasks to individual students.
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Publish campus assignments, evaluate student submissions, and assign rubric marks.
           </p>
         </div>
 
@@ -230,16 +249,15 @@ const AdminTasks = () => {
           <button
             type="button"
             onClick={fetchTasksAndStudents}
-            title="Refresh list"
-            className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors shadow-sm"
-            aria-label="Refresh list"
+            title="Reload assignments"
+            className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors shadow-sm"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
             type="button"
             onClick={handleOpenCreateModal}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-sm transition-all active:scale-[0.98]"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-md shadow-purple-500/20 transition-all active:scale-[0.98]"
           >
             <Plus className="w-4 h-4" />
             <span>Create Assignment</span>
@@ -248,17 +266,16 @@ const AdminTasks = () => {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        {/* Top search & counter */}
+      <div className="bg-white dark:bg-slate-800/90 p-4 sm:p-5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm space-y-3.5">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search assignments by title or subject..."
+              placeholder="Search assignments by title or student name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-9 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
+              className="w-full pl-9 pr-9 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
             {search && (
               <button
@@ -271,52 +288,31 @@ const AdminTasks = () => {
             )}
           </div>
 
-          <div className="flex items-center justify-between sm:justify-end gap-2.5">
-            <span className="text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-              Total: <strong className="text-slate-800">{tasks.length}</strong>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+              Total: <strong className="text-slate-800 dark:text-white">{tasks.length}</strong>
             </span>
             <button
               type="button"
               onClick={handleResetFilters}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              className="p-2 text-slate-400 hover:text-purple-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+              title="Reset Filters"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset</span>
+              <RotateCcw className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Filters Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
-          {/* Scope Filter */}
-          <div>
-            <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              Assignment Type
-            </label>
-            <select
-              value={selectedScope}
-              onChange={(e) => setSelectedScope(e.target.value)}
-              className="w-full text-xs py-2 px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
-            >
-              <option value="All">All Types</option>
-              <option value="all">Institution-wide</option>
-              <option value="individual">Individual Student</option>
-              <option value="personal">Student Personal</option>
-            </select>
-          </div>
-
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
           {/* Student Filter */}
           <div>
-            <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              Filter Student
+            <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+              Enrolled Student
             </label>
             <select
               value={selectedStudent}
-              onChange={(e) => {
-                setSelectedStudent(e.target.value);
-                setSearchParams(e.target.value !== 'All' ? { studentId: e.target.value } : {});
-              }}
-              className="w-full text-xs py-2 px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+              onChange={(e) => setSelectedStudent(e.target.value)}
+              className="w-full text-xs py-2 px-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
             >
               <option value="All">All Students</option>
               {students.map((s) => (
@@ -327,34 +323,31 @@ const AdminTasks = () => {
             </select>
           </div>
 
-          {/* Subject Filter */}
+          {/* Scope Filter */}
           <div>
-            <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              Subject
+            <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+              Target Scope
             </label>
             <select
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="w-full text-xs py-2 px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+              value={selectedScope}
+              onChange={(e) => setSelectedScope(e.target.value)}
+              className="w-full text-xs py-2 px-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
             >
-              <option value="All">All Subjects</option>
-              {subjectsList.map((subj) => (
-                <option key={subj} value={subj}>
-                  {subj}
-                </option>
-              ))}
+              <option value="All">All Types</option>
+              <option value="all">Institution-wide</option>
+              <option value="individual">Individual Student</option>
             </select>
           </div>
 
           {/* Priority */}
           <div>
-            <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+            <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
               Priority
             </label>
             <select
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
-              className="w-full text-xs py-2 px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+              className="w-full text-xs py-2 px-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
             >
               <option value="All">All Priorities</option>
               <option value="High">High</option>
@@ -365,13 +358,13 @@ const AdminTasks = () => {
 
           {/* Sort */}
           <div>
-            <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+            <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
               Sort
             </label>
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value)}
-              className="w-full text-xs py-2 px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+              className="w-full text-xs py-2 px-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
             >
               <option value="dueDateAsc">Earliest Due</option>
               <option value="dueDateDesc">Latest Due</option>
@@ -386,18 +379,18 @@ const AdminTasks = () => {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 animate-pulse">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="p-5 bg-white rounded-2xl border border-slate-200 space-y-3">
-              <div className="h-5 bg-slate-200 rounded w-1/3"></div>
-              <div className="h-7 bg-slate-100 rounded"></div>
-              <div className="h-10 bg-slate-100 rounded"></div>
+            <div key={i} className="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+              <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-1/3"></div>
+              <div className="h-7 bg-slate-100 dark:bg-slate-700/50 rounded"></div>
+              <div className="h-10 bg-slate-100 dark:bg-slate-700/50 rounded"></div>
             </div>
           ))}
         </div>
       ) : tasks.length === 0 ? (
-        <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-300">
+        <div className="p-12 text-center bg-white dark:bg-slate-800 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700">
           <Layers className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-slate-800">No matching assignments found</h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+          <h3 className="text-base font-bold text-slate-800 dark:text-white">No matching assignments found</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
             Try adjusting your search criteria or create a new assignment for enrolled students.
           </p>
         </div>
@@ -407,42 +400,49 @@ const AdminTasks = () => {
             const dueInfo = getDueStatusInfo(task.dueDate, 'Pending');
             const isInstitutionWide = task.scope === 'all';
             const isIndividual = task.scope === 'individual';
-            const isPersonal = task.scope === 'personal';
 
             return (
               <div
                 key={task._id}
-                className="relative flex flex-col justify-between p-5 bg-white rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-150"
+                className="relative flex flex-col justify-between p-5 bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200/90 dark:border-slate-700/80 shadow-sm hover:shadow-md transition-all duration-150"
               >
                 <div>
                   {/* Top Scope Badge & Audience */}
-                  <div className="flex items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-100">
-                    <div className="flex items-center gap-1.5">
+                  <div className="flex items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-100 dark:border-slate-700/80">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       {isInstitutionWide ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                           <Globe className="w-3 h-3" />
-                          Institution-wide
-                        </span>
-                      ) : isIndividual ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
-                          <UserCheck className="w-3 h-3" />
-                          Individual Student
+                          Institution
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                          <User className="w-3 h-3" />
-                          Student Personal
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                          <UserCheck className="w-3 h-3" />
+                          Individual
+                        </span>
+                      )}
+
+                      {task.category && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
+                          {task.category}
+                        </span>
+                      )}
+
+                      {task.isGroup && (
+                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                          <Users className="w-3 h-3" />
+                          Group
                         </span>
                       )}
                     </div>
 
                     {/* Assigned Student / Audience */}
-                    <div className="text-right text-xs text-slate-600 truncate max-w-[150px]">
+                    <div className="text-right text-xs text-slate-600 dark:text-slate-400 truncate max-w-[130px]">
                       {isInstitutionWide ? (
-                        <span className="font-medium text-purple-700">All Students</span>
+                        <span className="font-medium text-purple-700 dark:text-purple-300">All Students</span>
                       ) : (
-                        <span className="font-semibold text-slate-800">
-                          {task.assignedTo?.name || task.user?.name || 'Assigned Student'}
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {task.assignedTo?.name || task.user?.name || 'Student'}
                         </span>
                       )}
                     </div>
@@ -450,17 +450,17 @@ const AdminTasks = () => {
 
                   {/* Subject & Priority Badges */}
                   <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-xs font-medium border border-slate-200">
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 text-xs font-medium border border-slate-200 dark:border-slate-700">
                       {task.subject}
                     </span>
                     <div className="flex items-center gap-1">
                       <span
                         className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold ${
                           task.priority === 'High'
-                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
                             : task.priority === 'Medium'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                            : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                         }`}
                       >
                         {task.priority}
@@ -474,11 +474,11 @@ const AdminTasks = () => {
                   </div>
 
                   {/* Title & Description */}
-                  <h3 className="text-base font-semibold text-slate-900 leading-snug mb-1.5">
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-white leading-snug mb-1.5">
                     {task.title}
                   </h3>
                   {task.description ? (
-                    <p className="text-xs text-slate-600 line-clamp-2 mb-4 whitespace-pre-line">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mb-4 whitespace-pre-line">
                       {task.description}
                     </p>
                   ) : (
@@ -487,17 +487,28 @@ const AdminTasks = () => {
                 </div>
 
                 {/* Footer Actions */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 text-slate-500">
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-700/80 flex items-center justify-between text-xs gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                     <Calendar className="w-3.5 h-3.5 text-slate-400" />
                     <span>{formatDisplayDate(task.dueDate)}</span>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
+                    {/* Faculty Evaluate / Grade Button (Feature 5) */}
+                    <button
+                      type="button"
+                      onClick={() => setGradingTask(task)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors"
+                      title="Grade and evaluate student submissions"
+                    >
+                      <Award className="w-3.5 h-3.5" />
+                      <span>Evaluate</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => handleOpenEditModal(task)}
-                      className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors ml-1"
+                      className="p-1.5 text-slate-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 dark:hover:bg-slate-700"
                       title="Edit Assignment"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
@@ -505,7 +516,7 @@ const AdminTasks = () => {
                     <button
                       type="button"
                       onClick={() => setTaskToDelete(task)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 dark:hover:bg-slate-700"
                       title="Delete Assignment"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -518,33 +529,45 @@ const AdminTasks = () => {
         </div>
       )}
 
+      {/* Faculty Grading Modal (Feature 5) */}
+      {gradingTask && (
+        <GradingModal
+          isOpen={!!gradingTask}
+          onClose={() => setGradingTask(null)}
+          task={gradingTask}
+          onGraded={() => {
+            fetchTasksAndStudents();
+          }}
+        />
+      )}
+
       {/* Create / Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
-            <div className="flex items-center justify-between p-6 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-scale-up">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-700">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">
-                  {editingTask ? 'Edit Assignment' : 'Create Assignment'}
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {editingTask ? 'Edit Coursework' : 'Create Coursework'}
                 </h2>
-                <p className="text-xs text-slate-500">
-                  Manage institutional coursework scope and deadlines
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Manage institutional assignments, categories, and max marks
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
-              {/* Assignment Scope Selector */}
+              {/* Assignment Scope */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Assignment Type / Audience <span className="text-rose-500">*</span>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Assignment Audience <span className="text-rose-500">*</span>
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
@@ -552,8 +575,8 @@ const AdminTasks = () => {
                     onClick={() => setFormData({ ...formData, scope: 'all' })}
                     className={`py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
                       formData.scope === 'all'
-                        ? 'border-purple-600 bg-purple-50 text-purple-700 ring-2 ring-purple-500/20 shadow-sm'
-                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        ? 'border-purple-600 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 ring-2 ring-purple-500/20'
+                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
                     }`}
                   >
                     <Globe className="w-4 h-4" />
@@ -564,8 +587,8 @@ const AdminTasks = () => {
                     onClick={() => setFormData({ ...formData, scope: 'individual' })}
                     className={`py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
                       formData.scope === 'individual'
-                        ? 'border-purple-600 bg-purple-50 text-purple-700 ring-2 ring-purple-500/20 shadow-sm'
-                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        ? 'border-purple-600 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 ring-2 ring-purple-500/20'
+                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
                     }`}
                   >
                     <User className="w-4 h-4" />
@@ -574,16 +597,16 @@ const AdminTasks = () => {
                 </div>
               </div>
 
-              {/* Target Student Selector - ONLY displayed when scope is 'individual' */}
+              {/* Target Student Selector */}
               {formData.scope === 'individual' && (
                 <div className="animate-fade-in">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Designated Student <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={formData.studentId}
                     onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                     required
                   >
                     <option value="" disabled>Select an enrolled student...</option>
@@ -598,24 +621,24 @@ const AdminTasks = () => {
 
               {/* Title */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Assignment Title <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   maxLength={120}
-                  placeholder="e.g. Distributed Systems Final Milestone"
+                  placeholder="e.g. Distributed Systems Lab Project"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   required
                 />
               </div>
 
-              {/* Subject & Due Date */}
+              {/* Subject & Category */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Subject <span className="text-rose-500">*</span>
                   </label>
                   <input
@@ -623,43 +646,88 @@ const AdminTasks = () => {
                     placeholder="e.g. Computer Science"
                     value={formData.subject}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Category (Feature 9)
+                  </label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Due Date & Max Marks */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Due Date <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="date"
                     value={formData.dueDate}
                     onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                     required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Max Marks (Rubric)
+                  </label>
+                  <input
+                    type="number"
+                    min="10"
+                    max="1000"
+                    value={formData.maxMarks}
+                    onChange={(e) => setFormData({ ...formData, maxMarks: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
               </div>
 
-              {/* Priority */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Priority
-                </label>
-                <select
-                  value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
-                </select>
+              {/* Priority & Group Assignment Checkbox */}
+              <div className="grid grid-cols-2 gap-3 items-center">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Priority
+                  </label>
+                  <select
+                    value={formData.priority}
+                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
+                </div>
+
+                <div className="pt-5">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={formData.isGroup}
+                      onChange={(e) => setFormData({ ...formData, isGroup: e.target.checked })}
+                      className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300"
+                    />
+                    <span>Collaborative Group Project</span>
+                  </label>
+                </div>
               </div>
 
               {/* Description */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Description / Instructions
                 </label>
                 <textarea
@@ -667,24 +735,24 @@ const AdminTasks = () => {
                   placeholder="Instructions for students..."
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
                 />
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-700">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
                   disabled={isSubmitting}
-                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                  className="px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-sm transition-all"
+                  className="px-5 py-2 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-md shadow-purple-500/20 transition-all"
                 >
                   {editingTask ? 'Save Changes' : formData.scope === 'all' ? 'Publish to All Students' : 'Assign to Student'}
                 </button>

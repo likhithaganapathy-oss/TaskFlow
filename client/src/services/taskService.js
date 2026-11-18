@@ -11,6 +11,7 @@ export const taskService = {
     if (params.status && params.status !== 'All') query.append('status', params.status);
     if (params.priority && params.priority !== 'All') query.append('priority', params.priority);
     if (params.scope && params.scope !== 'All') query.append('scope', params.scope);
+    if (params.category && params.category !== 'All') query.append('category', params.category);
     if (params.sort) query.append('sort', params.sort);
 
     const queryString = query.toString();
@@ -47,10 +48,30 @@ export const taskService = {
   },
 
   /**
+   * Submit completed assignment file & notes
+   */
+  async submitTask(id, submissionData) {
+    return await api.post(`/tasks/${id}/submit`, submissionData);
+  },
+
+  /**
+   * Log focused Pomodoro study time to an assignment
+   */
+  async logStudyTime(id, { minutes = 25, isPomodoro = true }) {
+    return await api.post(`/tasks/${id}/study-time`, { minutes, isPomodoro });
+  },
+
+  /**
+   * Fetch student productivity analytics & trends
+   */
+  async getAnalytics() {
+    return await api.get('/tasks/analytics');
+  },
+
+  /**
    * Delete an assignment
    */
   async deleteTask(id) {
     return await api.delete(`/tasks/${id}`);
   },
 };
-

@@ -7,6 +7,8 @@ const {
   getAllTasks,
   createTaskForStudent,
   updateTaskByAdmin,
+  gradeSubmission,
+  getSubmissions,
   deleteTaskByAdmin,
 } = require('../controllers/adminController');
 const { protect, adminOnly } = require('../middleware/authMiddleware');
@@ -31,5 +33,7 @@ router.route('/tasks/:id')
   .put(updateTaskByAdmin)
   .delete(deleteTaskByAdmin);
 
-module.exports = router;
+router.get('/tasks/:id/submissions', getSubmissions);
+router.post('/tasks/:id/grade', gradeSubmission);
 
+module.exports = router;

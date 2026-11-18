@@ -2,9 +2,15 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { ThemeProvider } from './context/ThemeContext';
 import AppLayout from './layouts/AppLayout';
 import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
+import CalendarPage from './pages/CalendarPage';
+import PomodoroPage from './pages/PomodoroPage';
+import AIAssistantPage from './pages/AIAssistantPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import ProfilePage from './pages/ProfilePage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminTasks from './pages/admin/AdminTasks';
@@ -24,9 +30,9 @@ const ProtectedRoute = ({ children }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-3">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 gap-3">
         <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-        <p className="text-sm font-medium text-slate-500">
+        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
           Loading TaskFlow session...
         </p>
       </div>
@@ -48,7 +54,7 @@ const PublicRoute = ({ children }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     );
@@ -72,82 +78,89 @@ const RootRedirector = () => {
 function App() {
   return (
     <BrowserRouter>
-      <ToastProvider>
-        <AuthProvider>
-          <Routes>
-            {/* Public authentication routes */}
-            <Route
-              path="/login"
-              element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/register"
-              element={
-                <PublicRoute>
-                  <Register />
-                </PublicRoute>
-              }
-            />
+      <ThemeProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <Routes>
+              {/* Public authentication routes */}
+              <Route
+                path="/login"
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/register"
+                element={
+                  <PublicRoute>
+                    <Register />
+                  </PublicRoute>
+                }
+              />
 
-            {/* Protected application routes (inside master AppLayout) */}
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<RootRedirector />} />
-              
-              {/* Student accessible routes */}
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="tasks" element={<Tasks />} />
+              {/* Protected application routes (inside master AppLayout) */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<RootRedirector />} />
+                
+                {/* Core application routes */}
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="tasks" element={<Tasks />} />
+                <Route path="calendar" element={<CalendarPage />} />
+                <Route path="pomodoro" element={<PomodoroPage />} />
+                <Route path="ai-assistant" element={<AIAssistantPage />} />
+                <Route path="analytics" element={<AnalyticsPage />} />
+                <Route path="profile" element={<ProfilePage />} />
 
-              {/* Administrator only routes */}
-              <Route
-                path="admin"
-                element={
-                  <AdminRoute>
-                    <Navigate to="/admin/dashboard" replace />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="admin/dashboard"
-                element={
-                  <AdminRoute>
-                    <AdminDashboard />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="admin/users"
-                element={
-                  <AdminRoute>
-                    <AdminUsers />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="admin/tasks"
-                element={
-                  <AdminRoute>
-                    <AdminTasks />
-                  </AdminRoute>
-                }
-              />
-            </Route>
+                {/* Administrator only routes */}
+                <Route
+                  path="admin"
+                  element={
+                    <AdminRoute>
+                      <Navigate to="/admin/dashboard" replace />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/dashboard"
+                  element={
+                    <AdminRoute>
+                      <AdminDashboard />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/users"
+                  element={
+                    <AdminRoute>
+                      <AdminUsers />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/tasks"
+                  element={
+                    <AdminRoute>
+                      <AdminTasks />
+                    </AdminRoute>
+                  }
+                />
+              </Route>
 
-            {/* 404 Route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </ToastProvider>
+              {/* 404 Route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </ToastProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

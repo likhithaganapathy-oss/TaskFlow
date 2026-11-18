@@ -30,7 +30,7 @@ const AppLayout = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-800">
+    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 transition-colors">
       {/* Sidebar (desktop collapsible & mobile drawer) */}
       <Sidebar
         collapsed={sidebarCollapsed}
@@ -63,4 +63,3 @@ const AppLayout = () => {
 };
 
 export default AppLayout;
-

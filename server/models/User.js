@@ -33,6 +33,29 @@ const userSchema = new mongoose.Schema(
       },
       default: 'student',
     },
+    avatar: {
+      type: String,
+      default: 'avatar-1',
+    },
+    preferences: {
+      theme: {
+        type: String,
+        enum: ['light', 'dark', 'system'],
+        default: 'light',
+      },
+      pomodoroFocusMinutes: {
+        type: Number,
+        default: 25,
+      },
+      pomodoroBreakMinutes: {
+        type: Number,
+        default: 5,
+      },
+      dailyStudyGoalMinutes: {
+        type: Number,
+        default: 120,
+      },
+    },
   },
   {
     timestamps: true,
@@ -64,4 +87,3 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 const User = mongoose.model('User', userSchema);
 
 module.exports = User;
-

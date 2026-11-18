@@ -5,6 +5,8 @@ const { connectDB, isConnected } = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const aiRoutes = require('./routes/aiRoutes');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 // Load environment variables from .env file
@@ -33,9 +35,9 @@ app.use(
   })
 );
 
-// Body parsers
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Body parsers with 25MB limit for document uploads (PDF, DOCX, PPTX)
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // ── Health Check: reports database connectivity accurately ─────────────
 app.get('/api/health', async (req, res) => {
@@ -92,6 +94,8 @@ app.use(async (req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Centralized error handling
 app.use(notFound);
