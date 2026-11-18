@@ -35,7 +35,7 @@ const userSchema = new mongoose.Schema(
     },
     avatar: {
       type: String,
-      default: 'avatar-1',
+      default: '🎓',
     },
     preferences: {
       theme: {

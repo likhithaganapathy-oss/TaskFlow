@@ -63,7 +63,7 @@ const registerUser = async (req, res, next) => {
       email: normalizedEmail,
       password,
       role: 'student',
-      avatar: 'avatar-1',
+      avatar: '🎓',
     });
 
     // Generate token
@@ -136,7 +136,7 @@ const loginUser = async (req, res, next) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        avatar: user.avatar || 'avatar-1',
+        avatar: user.avatar || '🎓',
         preferences: user.preferences || { theme: 'light' },
         createdAt: user.createdAt,
       },
@@ -163,13 +163,13 @@ const getCurrentUser = async (req, res, next) => {
 };
 
 /**
- * @desc    Update user profile & preferences (avatar, theme, study goals)
+ * @desc    Update user profile & preferences (theme, study goals)
  * @route   PATCH /api/auth/profile
  * @access  Private
  */
 const updateProfile = async (req, res, next) => {
   try {
-    const { name, avatar, preferences } = req.body;
+    const { name, preferences } = req.body;
     const user = await User.findById(req.user._id);
 
     if (!user) {
@@ -180,7 +180,6 @@ const updateProfile = async (req, res, next) => {
     }
 
     if (name && name.trim()) user.name = name.trim();
-    if (avatar) user.avatar = avatar;
     if (preferences) {
       user.preferences = {
         ...user.preferences,

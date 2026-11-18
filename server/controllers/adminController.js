@@ -213,7 +213,7 @@ const getAllStudents = async (req, res, next) => {
         _id: student._id,
         name: student.name,
         email: student.email,
-        avatar: student.avatar || 'avatar-1',
+        avatar: student.avatar || '🎓',
         role: student.role,
         createdAt: student.createdAt,
         taskMetrics: {

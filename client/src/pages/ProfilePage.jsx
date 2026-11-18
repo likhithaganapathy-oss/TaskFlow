@@ -18,9 +18,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
 
-const AVATAR_OPTIONS = [
-  '🎓', '📚', '⚡', '💻', '🚀', '🧠', '🔬', '🌟', '🎨', '🔥', '🏆', '🦉'
-];
+
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth();
@@ -28,7 +26,7 @@ export default function ProfilePage() {
   const { showToast } = useToast();
 
   const [name, setName] = useState(user?.name || '');
-  const [selectedAvatar, setSelectedAvatar] = useState(user?.avatar || '🎓');
+  const selectedAvatar = '🎓';
   const [focusMinutes, setFocusMinutes] = useState(user?.preferences?.pomodoroFocusMinutes || 25);
   const [breakMinutes, setBreakMinutes] = useState(user?.preferences?.pomodoroBreakMinutes || 5);
   const [dailyGoalMinutes, setDailyGoalMinutes] = useState(user?.preferences?.dailyStudyGoalMinutes || 120);
@@ -41,7 +39,6 @@ export default function ProfilePage() {
     try {
       const res = await api.patch('/auth/profile', {
         name,
-        avatar: selectedAvatar,
         preferences: {
           theme,
           pomodoroFocusMinutes: Number(focusMinutes),
@@ -77,7 +74,7 @@ export default function ProfilePage() {
           <Settings className="w-6 h-6 text-slate-600 dark:text-slate-300" />
         </h1>
         <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-          Customize your study avatar, light/dark appearance, and Pomodoro focus targets.
+          Customize your light/dark appearance and Pomodoro focus targets.
         </p>
       </div>
 
@@ -103,29 +100,6 @@ export default function ProfilePage() {
                 <Mail className="w-3.5 h-3.5" />
                 <span>{user?.email}</span>
               </div>
-            </div>
-          </div>
-
-          {/* Avatar Selector */}
-          <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700/80 space-y-3">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Select Your Student Avatar
-            </label>
-            <div className="flex flex-wrap gap-2.5">
-              {AVATAR_OPTIONS.map((emoji) => (
-                <button
-                  type="button"
-                  key={emoji}
-                  onClick={() => setSelectedAvatar(emoji)}
-                  className={`w-11 h-11 text-xl rounded-xl flex items-center justify-center transition-all ${
-                    selectedAvatar === emoji
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-800 scale-110'
-                      : 'bg-slate-100 dark:bg-slate-700/60 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  {emoji}
-                </button>
-              ))}
             </div>
           </div>
         </div>
