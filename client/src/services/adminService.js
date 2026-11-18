@@ -24,6 +24,34 @@ export const adminService = {
   },
 
   /**
+   * Create a new student account (Admin)
+   */
+  async createStudent(studentData) {
+    return await api.post('/admin/users', studentData);
+  },
+
+  /**
+   * Update student details (Admin)
+   */
+  async updateStudent(id, studentData) {
+    return await api.put(`/admin/users/${id}`, studentData);
+  },
+
+  /**
+   * Toggle student activation status
+   */
+  async toggleStudentStatus(id) {
+    return await api.patch(`/admin/users/${id}/status`);
+  },
+
+  /**
+   * Send institutional announcement to all or selected students
+   */
+  async sendAnnouncement(data) {
+    return await api.post('/admin/announcements', data);
+  },
+
+  /**
    * Fetch assignments across all students with filters
    */
   async getAllTasks(params = {}) {
@@ -80,5 +108,45 @@ export const adminService = {
    */
   async deleteTask(id) {
     return await api.delete(`/admin/tasks/${id}`);
+  },
+
+  /**
+   * Fetch submission monitoring overview across all students
+   */
+  async getSubmissionOverview() {
+    const res = await api.get('/admin/submissions/overview');
+    return res.data;
+  },
+
+  /**
+   * Fetch exportable report dataset
+   */
+  async getReportData(type) {
+    const res = await api.get(`/admin/reports/${type}`);
+    return res.data;
+  },
+
+  /**
+   * Fetch institutional calendar events
+   */
+  async getCalendarEvents() {
+    const res = await api.get('/admin/calendar/events');
+    return res.data;
+  },
+
+  /**
+   * Create institutional calendar event
+   */
+  async createCalendarEvent(data) {
+    const res = await api.post('/admin/calendar/events', data);
+    return res.data;
+  },
+
+  /**
+   * Delete institutional calendar event
+   */
+  async deleteCalendarEvent(id) {
+    const res = await api.delete(`/admin/calendar/events/${id}`);
+    return res.data;
   },
 };

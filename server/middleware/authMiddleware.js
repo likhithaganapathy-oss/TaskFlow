@@ -29,6 +29,14 @@ const protect = async (req, res, next) => {
         });
       }
 
+      // Check if account has been deactivated by admin
+      if (user.isActive === false) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your account has been deactivated. Please contact your administrator.',
+        });
+      }
+
       req.user = user;
       return next();
     } catch (error) {

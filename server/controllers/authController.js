@@ -163,13 +163,13 @@ const getCurrentUser = async (req, res, next) => {
 };
 
 /**
- * @desc    Update user profile & preferences (theme, study goals)
+ * @desc    Update user profile & preferences (theme, study goals, academic info)
  * @route   PATCH /api/auth/profile
  * @access  Private
  */
 const updateProfile = async (req, res, next) => {
   try {
-    const { name, preferences } = req.body;
+    const { name, preferences, rollNumber, branch, year, section, department, designation } = req.body;
     const user = await User.findById(req.user._id);
 
     if (!user) {
@@ -180,6 +180,19 @@ const updateProfile = async (req, res, next) => {
     }
 
     if (name && name.trim()) user.name = name.trim();
+
+    // Student academic fields
+    if (rollNumber !== undefined) user.rollNumber = rollNumber.trim();
+    if (branch !== undefined) user.branch = branch.trim();
+    if (year !== undefined) user.year = year;
+    if (section !== undefined) user.section = section.trim();
+
+    // Admin fields
+    if (user.role === 'admin') {
+      if (department !== undefined) user.department = department.trim();
+      if (designation !== undefined) user.designation = designation.trim();
+    }
+
     if (preferences) {
       user.preferences = {
         ...user.preferences,
@@ -198,8 +211,128 @@ const updateProfile = async (req, res, next) => {
         email: user.email,
         role: user.role,
         avatar: user.avatar,
+        rollNumber: user.rollNumber,
+        branch: user.branch,
+        year: user.year,
+        section: user.section,
+        department: user.department,
+        designation: user.designation,
         preferences: user.preferences,
         createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Change user password
+ * @route   PATCH /api/auth/change-password
+ * @access  Private
+ */
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword, confirmNewPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide current password and new password.',
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long.',
+      });
+    }
+
+    if (confirmNewPassword !== undefined && newPassword !== confirmNewPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'New passwords do not match.',
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const isMatch = await user.matchPassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect.',
+      });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password changed successfully!',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Update user email address
+ * @route   PATCH /api/auth/update-email
+ * @access  Private
+ */
+const updateEmail = async (req, res, next) => {
+  try {
+    const { newEmail, password } = req.body;
+
+    if (!newEmail || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide new email and your current password for verification.',
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    // Verify password before allowing email change
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Password verification failed.',
+      });
+    }
+
+    const normalizedEmail = newEmail.toLowerCase().trim();
+
+    // Check if email is already in use
+    const emailExists = await User.findOne({ email: normalizedEmail, _id: { $ne: user._id } });
+    if (emailExists) {
+      return res.status(409).json({
+        success: false,
+        message: 'This email is already associated with another account.',
+      });
+    }
+
+    user.email = normalizedEmail;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Email updated successfully!',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
       },
     });
   } catch (error) {
@@ -212,4 +345,6 @@ module.exports = {
   loginUser,
   getCurrentUser,
   updateProfile,
+  changePassword,
+  updateEmail,
 };

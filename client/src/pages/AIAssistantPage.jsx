@@ -74,6 +74,7 @@ export default function AIAssistantPage() {
     // Append user query message
     const actionPrompts = {
       summarize: `📝 Summarize deliverables and checklist for "${title}"`,
+      guidance: `🎯 Personalized tips & strategy for top grade on "${title}"`,
       explain: `💡 Explain core academic concepts for "${title}"`,
       schedule: `⏱️ Build a 4-day Pomodoro study schedule for "${title}"`,
       breakdown: `🎯 Break down "${title}" into 4 clear milestones`,
@@ -280,6 +281,24 @@ export default function AIAssistantPage() {
                   </div>
                   <div className="text-[11px] text-slate-500 dark:text-slate-400">
                     Key objectives & checklist
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleQuickAction('guidance')}
+                disabled={loading}
+                className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700/80 hover:border-purple-300 dark:hover:border-purple-600 hover:bg-purple-50/50 dark:hover:bg-purple-950/20 text-left transition-all group disabled:opacity-50"
+              >
+                <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 group-hover:scale-105 transition-transform">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Personalized Guidance
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Strategy & tips for top marks
                   </div>
                 </div>
               </button>

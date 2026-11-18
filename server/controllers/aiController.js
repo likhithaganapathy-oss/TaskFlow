@@ -82,6 +82,18 @@ const generateStructuredAcademicAdvice = (action, { title, subject, description,
       `* **Quality Checklist:** Ensure academic citations, check calculations, and review formatting prior to submission.`;
   }
 
+  if (action === 'guidance') {
+    return `### 🎯 Personalized Academic Guidance for "${safeTitle}"\n\n` +
+      `* **Strategic Approach (${safeSubject}):**\n` +
+      `  1. Carefully dissect the assignment rubric before writing any code or draft.\n` +
+      `  2. Formulate a structured thesis or architectural blueprint first.\n` +
+      `  3. Allocate 70% of time to core development/analysis and 30% to verification and report polish.\n\n` +
+      `* **Top Traps to Avoid:**\n` +
+      `  - Submitting unformatted code or missing units on calculations.\n` +
+      `  - Leaving submission to the last 30 minutes before deadline.\n\n` +
+      `* **Pro-Tip for Excellence:** Include diagrams, cite primary literature/lectures, and add clean markdown headers for maximum clarity.`;
+  }
+
   if (action === 'explain') {
     const topic = query || safeTitle;
     return `### 🧠 Topic Deep-Dive: "${topic}"\n\n` +
@@ -135,6 +147,8 @@ const getAIAssistance = async (req, res, next) => {
     let prompt = '';
     if (action === 'summarize') {
       prompt = `Please provide a concise, structured summary and key deliverables checklist for this assignment:\nTitle: ${title}\nSubject: ${subject}\nInstructions: ${description}`;
+    } else if (action === 'guidance') {
+      prompt = `Provide personalized step-by-step academic guidance and tips to achieve top marks on this assignment:\nTitle: ${title}\nSubject: ${subject}\nRequirements: ${description}\nGive specific recommendations for preparation, technical execution, and avoiding common mistakes.`;
     } else if (action === 'explain') {
       prompt = `Please explain the key academic concepts and give study intuition for:\nTopic/Question: ${query || title}\nSubject: ${subject}\nContext: ${description}`;
     } else if (action === 'schedule') {

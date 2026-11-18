@@ -1,4 +1,5 @@
 const Notification = require('../models/Notification');
+const { checkStudentDeadlines } = require('../utils/deadlineChecker');
 
 /**
  * @desc    Get all notifications for logged-in user
@@ -7,6 +8,10 @@ const Notification = require('../models/Notification');
  */
 const getNotifications = async (req, res, next) => {
   try {
+    // Automatically trigger deadline checks for students
+    if (req.user && req.user.role === 'student') {
+      await checkStudentDeadlines(req.user._id);
+    }
     const { unreadOnly, limit = 20 } = req.query;
     const filter = { recipient: req.user._id };
 

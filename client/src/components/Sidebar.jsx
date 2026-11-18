@@ -16,6 +16,9 @@ import {
   ShieldCheck,
   Users,
   Layers,
+  FileCheck2,
+  Megaphone,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -44,6 +47,12 @@ const Sidebar = ({
       path: '/calendar',
       icon: Calendar,
       badge: 'Feature 2',
+    },
+    {
+      name: 'Study Planner',
+      path: '/study-planner',
+      icon: Clock,
+      badge: 'Schedule',
     },
     {
       name: 'Pomodoro Focus',
@@ -87,20 +96,39 @@ const Sidebar = ({
       icon: Layers,
     },
     {
-      name: 'Calendar & Schedules',
-      path: '/calendar',
+      name: 'Submission Console',
+      path: '/admin/submissions',
+      icon: FileCheck2,
+    },
+    {
+      name: 'Academic Subjects',
+      path: '/admin/subjects',
+      icon: BookOpen,
+    },
+    {
+      name: 'Project Groups',
+      path: '/admin/groups',
+      icon: Users,
+    },
+    {
+      name: 'Announcements',
+      path: '/admin/announcements',
+      icon: Megaphone,
+    },
+    {
+      name: 'Report Generator',
+      path: '/admin/reports',
+      icon: FileSpreadsheet,
+    },
+    {
+      name: 'Campus Calendar',
+      path: '/admin/calendar',
       icon: Calendar,
     },
     {
       name: 'Campus Analytics',
       path: '/analytics',
       icon: BarChart3,
-    },
-    {
-      name: 'AI Study Assistant',
-      path: '/ai-assistant',
-      icon: Sparkles,
-      badge: 'AI ✨',
     },
     {
       name: 'Profile & Settings',

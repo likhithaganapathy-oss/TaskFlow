@@ -7,6 +7,9 @@ const taskRoutes = require('./routes/taskRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const studyPlanRoutes = require('./routes/studyPlanRoutes');
+const subjectRoutes = require('./routes/subjectRoutes');
+const groupRoutes = require('./routes/groupRoutes');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 // Load environment variables from .env file
@@ -96,6 +99,9 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/study-plan', studyPlanRoutes);
+app.use('/api/subjects', subjectRoutes);
+app.use('/api/groups', groupRoutes);
 
 // Centralized error handling
 app.use(notFound);

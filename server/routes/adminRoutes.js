@@ -3,6 +3,9 @@ const router = express.Router();
 const {
   getAdminStats,
   getAllStudents,
+  createStudent,
+  updateStudent,
+  toggleStudentStatus,
   deleteStudent,
   getAllTasks,
   createTaskForStudent,
@@ -10,7 +13,15 @@ const {
   gradeSubmission,
   getSubmissions,
   deleteTaskByAdmin,
+  sendAnnouncement,
 } = require('../controllers/adminController');
+const {
+  getSubmissionMonitoring,
+  getCalendarEvents,
+  createCalendarEvent,
+  deleteCalendarEvent,
+  getReportData,
+} = require('../controllers/adminAdvancedController');
 const { protect, adminOnly } = require('../middleware/authMiddleware');
 
 // All admin routes strictly require authentication and the 'admin' role
@@ -21,8 +32,31 @@ router.use(adminOnly);
 router.get('/stats', getAdminStats);
 
 // Student accounts management
-router.get('/users', getAllStudents);
-router.delete('/users/:id', deleteStudent);
+router.route('/users')
+  .get(getAllStudents)
+  .post(createStudent);
+
+router.route('/users/:id')
+  .put(updateStudent)
+  .delete(deleteStudent);
+
+router.patch('/users/:id/status', toggleStudentStatus);
+
+// Announcements
+router.post('/announcements', sendAnnouncement);
+
+// Submission Monitoring Overview
+router.get('/submissions/overview', getSubmissionMonitoring);
+
+// Institutional Calendar Events
+router.route('/calendar/events')
+  .get(getCalendarEvents)
+  .post(createCalendarEvent);
+
+router.delete('/calendar/events/:id', deleteCalendarEvent);
+
+// Report Generation
+router.get('/reports/:type', getReportData);
 
 // Institutional task management
 router.route('/tasks')

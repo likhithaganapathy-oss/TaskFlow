@@ -37,6 +37,41 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '🎓',
     },
+    rollNumber: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    branch: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    year: {
+      type: Number,
+      min: 1,
+      max: 4,
+      default: null,
+    },
+    section: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    department: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    designation: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
     preferences: {
       theme: {
         type: String,
@@ -54,6 +89,14 @@ const userSchema = new mongoose.Schema(
       dailyStudyGoalMinutes: {
         type: Number,
         default: 120,
+      },
+      deadlineReminders: {
+        type: Boolean,
+        default: true,
+      },
+      reminderHoursBefore: {
+        type: [Number],
+        default: [24, 6, 1],
       },
     },
   },

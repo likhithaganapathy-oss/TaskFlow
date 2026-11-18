@@ -10,10 +10,17 @@ import CalendarPage from './pages/CalendarPage';
 import PomodoroPage from './pages/PomodoroPage';
 import AIAssistantPage from './pages/AIAssistantPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import StudyPlannerPage from './pages/StudyPlannerPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminTasks from './pages/admin/AdminTasks';
+import AdminSubmissions from './pages/admin/AdminSubmissions';
+import AdminSubjects from './pages/admin/AdminSubjects';
+import AdminGroups from './pages/admin/AdminGroups';
+import AdminAnnouncements from './pages/admin/AdminAnnouncements';
+import AdminReports from './pages/admin/AdminReports';
+import AdminCalendar from './pages/admin/AdminCalendar';
 import AdminRoute from './components/AdminRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -116,6 +123,7 @@ function App() {
                 <Route path="tasks" element={<Tasks />} />
                 <Route path="calendar" element={<CalendarPage />} />
                 <Route path="pomodoro" element={<PomodoroPage />} />
+                <Route path="study-planner" element={<StudyPlannerPage />} />
                 <Route path="ai-assistant" element={<AIAssistantPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="profile" element={<ProfilePage />} />
@@ -150,6 +158,54 @@ function App() {
                   element={
                     <AdminRoute>
                       <AdminTasks />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/submissions"
+                  element={
+                    <AdminRoute>
+                      <AdminSubmissions />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/subjects"
+                  element={
+                    <AdminRoute>
+                      <AdminSubjects />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/groups"
+                  element={
+                    <AdminRoute>
+                      <AdminGroups />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/announcements"
+                  element={
+                    <AdminRoute>
+                      <AdminAnnouncements />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/reports"
+                  element={
+                    <AdminRoute>
+                      <AdminReports />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/calendar"
+                  element={
+                    <AdminRoute>
+                      <AdminCalendar />
                     </AdminRoute>
                   }
                 />

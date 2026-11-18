@@ -146,7 +146,7 @@ const getAllStudents = async (req, res, next) => {
 
     const totalCount = await User.countDocuments(query);
     const students = await User.find(query)
-      .select('name email avatar role createdAt')
+      .select('name email avatar role rollNumber branch year section isActive createdAt')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -215,6 +215,11 @@ const getAllStudents = async (req, res, next) => {
         email: student.email,
         avatar: student.avatar || '🎓',
         role: student.role,
+        rollNumber: student.rollNumber || '',
+        branch: student.branch || '',
+        year: student.year || null,
+        section: student.section || '',
+        isActive: student.isActive !== false,
         createdAt: student.createdAt,
         taskMetrics: {
           total: totalApplicable,
@@ -766,6 +771,215 @@ const deleteTaskByAdmin = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Create a new student account (Admin created)
+ * @route   POST /api/admin/users
+ * @access  Private/Admin
+ */
+const createStudent = async (req, res, next) => {
+  try {
+    const { name, email, password, rollNumber, branch, year, section } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, email, and password are required.',
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters.',
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const existing = await User.findOne({ email: normalizedEmail });
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: 'An account with this email already exists.',
+      });
+    }
+
+    const student = await User.create({
+      name: name.trim(),
+      email: normalizedEmail,
+      password,
+      role: 'student',
+      avatar: '🎓',
+      rollNumber: rollNumber ? rollNumber.trim() : '',
+      branch: branch ? branch.trim() : '',
+      year: year || null,
+      section: section ? section.trim() : '',
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Student account for ${student.name} created successfully!`,
+      student: {
+        _id: student._id,
+        name: student.name,
+        email: student.email,
+        role: student.role,
+        rollNumber: student.rollNumber,
+        branch: student.branch,
+        year: student.year,
+        section: student.section,
+        isActive: student.isActive,
+        createdAt: student.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Update a student account details
+ * @route   PUT /api/admin/users/:id
+ * @access  Private/Admin
+ */
+const updateStudent = async (req, res, next) => {
+  try {
+    const student = await User.findById(req.params.id);
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found.' });
+    }
+
+    if (student.role === 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin accounts cannot be edited via student management.',
+      });
+    }
+
+    const { name, email, rollNumber, branch, year, section, password } = req.body;
+
+    if (name && name.trim()) student.name = name.trim();
+    if (email) {
+      const normalizedEmail = email.toLowerCase().trim();
+      const emailExists = await User.findOne({ email: normalizedEmail, _id: { $ne: student._id } });
+      if (emailExists) {
+        return res.status(409).json({ success: false, message: 'Email already in use.' });
+      }
+      student.email = normalizedEmail;
+    }
+    if (rollNumber !== undefined) student.rollNumber = rollNumber.trim();
+    if (branch !== undefined) student.branch = branch.trim();
+    if (year !== undefined) student.year = year;
+    if (section !== undefined) student.section = section.trim();
+    if (password && password.length >= 6) student.password = password;
+
+    await student.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Student ${student.name} updated successfully!`,
+      student: {
+        _id: student._id,
+        name: student.name,
+        email: student.email,
+        role: student.role,
+        rollNumber: student.rollNumber,
+        branch: student.branch,
+        year: student.year,
+        section: student.section,
+        isActive: student.isActive,
+        createdAt: student.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Activate or deactivate a student account
+ * @route   PATCH /api/admin/users/:id/status
+ * @access  Private/Admin
+ */
+const toggleStudentStatus = async (req, res, next) => {
+  try {
+    const student = await User.findById(req.params.id);
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found.' });
+    }
+
+    if (student.role === 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin accounts cannot be deactivated via student management.',
+      });
+    }
+
+    student.isActive = !student.isActive;
+    await student.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Student ${student.name} has been ${student.isActive ? 'activated' : 'deactivated'}.`,
+      student: {
+        _id: student._id,
+        name: student.name,
+        isActive: student.isActive,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Send announcement notification to all or selected students
+ * @route   POST /api/admin/announcements
+ * @access  Private/Admin
+ */
+const sendAnnouncement = async (req, res, next) => {
+  try {
+    const { title, message, recipients } = req.body;
+
+    if (!title || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title and message are required.',
+      });
+    }
+
+    let targetStudents;
+    if (!recipients || recipients === 'all') {
+      targetStudents = await User.find({ role: 'student', isActive: true }).select('_id');
+    } else if (Array.isArray(recipients)) {
+      targetStudents = recipients.map((id) => ({ _id: id }));
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid recipients format.' });
+    }
+
+    const Notification = require('../models/Notification');
+    const notifications = targetStudents.map((s) => ({
+      recipient: s._id,
+      sender: req.user._id,
+      title: title.trim(),
+      message: message.trim(),
+      type: 'announcement',
+      link: '/dashboard',
+    }));
+
+    await Notification.insertMany(notifications);
+
+    return res.status(201).json({
+      success: true,
+      message: `Announcement sent to ${targetStudents.length} student(s)!`,
+      count: targetStudents.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAdminStats,
   getAllStudents,
@@ -776,4 +990,8 @@ module.exports = {
   gradeSubmission,
   getSubmissions,
   deleteTaskByAdmin,
+  createStudent,
+  updateStudent,
+  toggleStudentStatus,
+  sendAnnouncement,
 };

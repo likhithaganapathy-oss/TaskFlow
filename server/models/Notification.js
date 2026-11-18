@@ -27,7 +27,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['assignment', 'deadline', 'submission', 'feedback', 'system'],
+      enum: ['assignment', 'deadline', 'submission', 'feedback', 'system', 'announcement', 'reminder'],
       default: 'system',
     },
     link: {
